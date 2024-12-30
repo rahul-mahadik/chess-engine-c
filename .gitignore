@@ -1,0 +1,10 @@
+# Compiled files
+chess_engine_v1
+*.o
+
+# IDE specific files
+.vscode/
+.idea/
+
+# OS specific files
+.DS_Store

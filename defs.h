@@ -24,6 +24,9 @@ typedef unsigned long long U64;
 #define NUM_SQ 120 // Board representation uses 120 squares (12x10 board)
 #define MAX_MOVES 2048 // Maximum number of moves in a game
 
+    
+#define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" // FEN (Forsyth-Edwards Notation) string representing the starting position of a chess game
+
 // Piece representation - empty square and white/black pieces
 enum {
     EMPTY, wP, wN, wB, wR, wQ, wK, bP, bN, bB, bR, bQ, bK
@@ -53,7 +56,7 @@ enum {
     A5 = 61, B5, C5, D5, E5, F5, G5, H5,
     A6 = 71, B6, C6, D6, E6, F6, G6, H6,
     A7 = 81, B7, C7, D7, E7, F7, G7, H7,
-    A8 = 91, B8, C8, D8, E8, F8, G8, H8, NO_SQ
+    A8 = 91, B8, C8, D8, E8, F8, G8, H8, NO_SQ, OFFBOARD
 };
 
 // Castling permission bits
@@ -72,7 +75,7 @@ typedef struct {
     int castlePerm;
     int enPas;
     int fiftyMove;
-    U64 posKey;
+    U64 posKey; // Unique position key
 } UNDO;
 
 // Main board structure containing all game state
@@ -93,9 +96,10 @@ typedef struct {
 
     // Piece counting and tracking
     int pceNum[13];       // Number of each piece type
-    int bigPce[3];        // Number of non-pawn pieces per side
-    int majPce[3];        // Number of major pieces (rooks, queens) per side
-    int minPce[3];        // Number of minor pieces (bishops, knights) per side
+    int bigPce[2];        // Number of non-pawn pieces per side
+    int majPce[2];        // Number of major pieces (rooks, queens) per side
+    int minPce[2];        // Number of minor pieces (bishops, knights) per side
+    int material[2];     // Material count per side
     int pList[13][10];    // Piece list: tracks locations of each piece type
 
     // Move history
@@ -104,7 +108,8 @@ typedef struct {
 
 // Utility macros
 #define FrToSq(f,r) ( (21 + (f) + (r) * 10) )  // Convert file/rank to 120-square index
-#define Sq64(sq120) Sq120ToSq64[sq120]         // Convert 120-square to 64-square index
+#define Sq64(sq120) Sq120ToSq64[sq120]        // Convert 120-square to 64-square index
+#define Sq120(sq64) Sq64ToSq120[sq64]        // Convert 64-square to 120-square index
 #define POP(b) PopBit(b)                        // Pop least significant bit from bitboard
 #define COUNT(b) CountBits(b)                   // Count bits in bitboard
 #define SET_BIT(bb, sq) bb |= SetMask[sq]      // Set bit in bitboard
@@ -115,7 +120,22 @@ extern int Sq120ToSq64[NUM_SQ];
 extern int Sq64ToSq120[64];
 extern U64 SetMask[64];
 extern U64 ClearMask[64];
+extern U64 PieceKeys[13][120];  
+extern U64 SideKey;            
+extern U64 CastleKeys[16];      
+extern char PceChar[];
+extern char RankChar[];
+extern char FileChar[];
+extern char SideChar[];
 
+extern int PceBig[13];
+extern int PceMin[13];
+extern int PceMaj[13];
+extern int PceVal[13];
+extern int PceColor[13];
+
+extern int FilesBoard[NUM_SQ];
+extern int RanksBoard[NUM_SQ];
 
 // Function declarations
     // init.c
@@ -125,4 +145,13 @@ extern void AllInit();
 extern void PrintBitBoard(U64 bitBoard);
 extern int PopBit(U64 *bitBoard);
 extern int CountBits(U64 bitBoard);
+
+    // hashkeys.c
+extern U64 GenerateHashKey(const BOARD *pos);
+
+    // board.c
+extern void ResetBoard(BOARD *pos);
+extern int ParseFen(char *fen, BOARD *pos);
+extern void PrintBoard(const BOARD *pos);
+extern void UpdateMaterial(BOARD *pos);
 #endif

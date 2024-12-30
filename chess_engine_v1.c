@@ -1,20 +1,28 @@
 #include "stdio.h"
+#include "stdlib.h"
 #include "defs.h"
+
+#define FEN1 "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+#define FEN2 "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2"
+#define FEN3 "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"
 
 int main() {
     // Initialize lookup tables and bit masks
     AllInit();
     
-    // Create empty bitboard
-    U64 pbitBoard = 0ULL;
+    BOARD board[1];
 
-    // Set bit at D2 square and print
-    SET_BIT(pbitBoard, Sq64(D2));
-    PrintBitBoard(pbitBoard);
+    ParseFen(START_FEN, board);
+    PrintBoard(board);
 
-    // Clear bit at D2 square and print
-    CLEAR_BIT(pbitBoard, Sq64(D2));
-    PrintBitBoard(pbitBoard);
+    ParseFen(FEN1, board);
+    PrintBoard(board);
+
+    ParseFen(FEN2, board);
+    PrintBoard(board);
+
+    ParseFen(FEN3, board);
+    PrintBoard(board);
 
     return 0;
 }
