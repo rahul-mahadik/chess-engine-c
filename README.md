@@ -5,12 +5,12 @@ A chess engine built from scratch in C
 
 ## Development Log
 
-### Dec 29 2024
+### Dec 2024
 - Implemented Zobrist hashing for unique position keys
 - Added FEN (Forsyth–Edwards Notation) string parsing for board setup
 - Created comprehensive board representation (material counting, castling, en passant, etc.)
 
-### Dec 28 2024
+### Dec 2024
 - Implemented 120-square to 64-square board mapping
 - Added bitboard functionality for pawn structure handling
 - Handled board initialization and bit mask functions
