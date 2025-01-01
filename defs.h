@@ -1,9 +1,9 @@
-#ifndef DEFS_H // Header guard to prevent multiple inclusion
+#ifndef DEFS_H
 #define DEFS_H
 
 #include <stdlib.h>
 
-// Debug assertion macro - only active when DEBUG is defined
+// Debug assertion macro
 #define DEBUG
 
 #ifndef DEBUG
@@ -21,13 +21,12 @@ typedef unsigned long long U64;
 
 // Basic constants and enums
 #define NAME "Chess Engine V1"
-#define NUM_SQ 120 // Board representation uses 120 squares (12x10 board)
+#define NUM_SQ 120 // 120 squares for board representation
 #define MAX_MOVES 2048 // Maximum number of moves in a game
 
-    
-#define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" // FEN (Forsyth-Edwards Notation) string representing the starting position of a chess game
+#define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" // Starting position FEN
 
-// Piece representation - empty square and white/black pieces
+// Piece representation
 enum {
     EMPTY, wP, wN, wB, wR, wQ, wK, bP, bN, bB, bR, bQ, bK
 };
@@ -47,7 +46,6 @@ enum {
 };
 
 // Square indices for 120-square board representation
-// First digit is rank, second digit is file (e.g. A1 = 21)
 enum {
     A1 = 21, B1, C1, D1, E1, F1, G1, H1,
     A2 = 31, B2, C2, D2, E2, F2, G2, H2,
@@ -69,6 +67,11 @@ enum {
     FALSE, TRUE 
 };
 
+typedef struct {
+    int move;
+    int score;
+} MOVE;
+
 // Structure to store moves for undo functionality
 typedef struct {
     int move;
@@ -80,12 +83,10 @@ typedef struct {
 
 // Main board structure containing all game state
 typedef struct {
-    // Board representation
     int pieces[NUM_SQ];    // Piece placement on 120-square board
     U64 pawns[3];         // Bitboards for white, black, and both pawns
     int KingSq[2];        // King positions for both sides
 
-    // Game state information
     int side;             // Side to move
     int enPas;            // En passant square
     int fiftyMove;        // Fifty move counter
@@ -94,16 +95,14 @@ typedef struct {
     int castlePerm;       // Castling permissions
     U64 posKey;           // Unique position key
 
-    // Piece counting and tracking
     int pceNum[13];       // Number of each piece type
     int bigPce[2];        // Number of non-pawn pieces per side
-    int majPce[2];        // Number of major pieces (rooks, queens) per side
-    int minPce[2];        // Number of minor pieces (bishops, knights) per side
-    int material[2];     // Material count per side
+    int majPce[2];        // Number of major pieces per side
+    int minPce[2];        // Number of minor pieces per side
+    int material[2];      // Material count per side
     int pList[13][10];    // Piece list: tracks locations of each piece type
 
-    // Move history
-    UNDO history[MAX_MOVES];
+    UNDO history[MAX_MOVES]; // Move history
 } BOARD;
 
 // Utility macros
@@ -114,6 +113,29 @@ typedef struct {
 #define COUNT(b) CountBits(b)                   // Count bits in bitboard
 #define SET_BIT(bb, sq) bb |= SetMask[sq]      // Set bit in bitboard
 #define CLEAR_BIT(bb, sq) bb &= ClearMask[sq]  // Clear bit in bitboard
+#define IsBQ(pce) (PceBishopQueen[pce])
+#define IsRQ(pce) (PceRookQueen[pce])
+#define IsKi(pce) (PceKing[pce])
+#define IsKn(pce) (PceKnight[pce])
+
+// Move bit operations - move is stored in a single 32-bit integer
+// bits 0-6: From square (7 bits)
+// bits 7-13: To square (7 bits)  
+// bits 14-17: Captured piece (4 bits)
+// bits 18-19: Reserved
+// bits 20-23: Promoted piece (4 bits)
+// bits 24-27: Move flags
+#define FROMSQ(m) ((m) & 0x7F)
+#define TOSQ(m) ((m) >> 7 & 0x7F)
+#define CAPTURED(m) ((m) >> 14 & 0xF)
+#define PROMOTED(m) ((m) >> 20 & 0xF)
+
+// Move flag bits
+#define FLAG_EP 0x40000        // En passant capture
+#define FLAG_CASTLE 0x80000    // Castle move
+#define FLAG_PAWNSTART 0x1000000  // Pawn first move
+#define FLAG_CAPTURE 0x7C000   // Capture
+#define FLAG_PROMOTE 0xF00000  // Promotion
 
 // Globals
 extern int Sq120ToSq64[NUM_SQ];
@@ -137,6 +159,11 @@ extern int PceColor[13];
 extern int FilesBoard[NUM_SQ];
 extern int RanksBoard[NUM_SQ];
 
+extern int PceKnight[13];
+extern int PceBishopQueen[13];
+extern int PceRookQueen[13];
+extern int PceKing[13];
+
 // Function declarations
     // init.c
 extern void AllInit();
@@ -154,4 +181,13 @@ extern void ResetBoard(BOARD *pos);
 extern int ParseFen(char *fen, BOARD *pos);
 extern void PrintBoard(const BOARD *pos);
 extern void UpdateMaterial(BOARD *pos);
+extern int CheckBoard(const BOARD *pos);
+
+    // attack.c
+extern int SqAttacked(const int sq, const int side, const BOARD *pos);
+
+    // io.c
+extern char *PrMove(const int move);
+extern char *PrSq(const int sq);
+
 #endif

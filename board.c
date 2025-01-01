@@ -1,6 +1,84 @@
 #include "defs.h"
 #include "stdio.h"
 
+// Validate the board state
+int CheckBoard(const BOARD *pos) {
+    int temp_PceNum[13] = {0};
+    int temp_BigPce[2] = {0};
+    int temp_MajPce[2] = {0};
+    int temp_MinPce[2] = {0};
+    int temp_Material[2] = {0};
+
+    int sq64, temp_pce, temp_pce_num, sq120, color, pawn_count;
+    U64 temp_pawns[3] = {0ULL, 0ULL, 0ULL};
+
+    temp_pawns[WHITE] = pos->pawns[WHITE];
+    temp_pawns[BLACK] = pos->pawns[BLACK];
+    temp_pawns[BOTH] = pos->pawns[BOTH];
+
+    // Validate piece positions
+    for(temp_pce = wP; temp_pce < bK; temp_pce++) {
+        for(temp_pce_num = 0; temp_pce_num < pos->pceNum[temp_pce]; temp_pce_num++) {
+            sq120 = pos->pList[temp_pce][temp_pce_num];
+            ASSERT(pos->pieces[sq120] == temp_pce);
+        }
+    }
+
+    // Count pieces and validate material
+    for (sq64 = 0; sq64 < 64; sq64++) {
+        sq120 = Sq120(sq64);
+        temp_pce = pos->pieces[sq120];
+        temp_PceNum[temp_pce]++;
+        color = PceColor[temp_pce];
+        if (PceBig[temp_pce]) temp_BigPce[color]++;
+        if (PceMaj[temp_pce]) temp_MajPce[color]++;
+        if (PceMin[temp_pce]) temp_MinPce[color]++;
+        temp_Material[color] += PceVal[temp_pce];
+    }
+
+    // Validate piece counts
+    for(temp_pce = wP; temp_pce <= bK; ++temp_pce) {
+        ASSERT(temp_PceNum[temp_pce] == pos->pceNum[temp_pce]);
+    }
+
+    // Validate pawn counts
+    pawn_count = COUNT(temp_pawns[WHITE]);
+    ASSERT(pawn_count == pos->pceNum[wP]);
+    pawn_count = COUNT(temp_pawns[BLACK]);
+    ASSERT(pawn_count == pos->pceNum[bP]);
+    pawn_count = COUNT(temp_pawns[BOTH]);
+    ASSERT(pawn_count == (pos->pceNum[bP] + pos->pceNum[wP]));
+
+    // Validate pawn positions
+    while(temp_pawns[WHITE]) {
+        sq64 = POP(&temp_pawns[WHITE]);
+        ASSERT(pos->pieces[Sq120(sq64)] == wP);
+    }
+    while(temp_pawns[BLACK]) {
+        sq64 = POP(&temp_pawns[BLACK]);
+        ASSERT(pos->pieces[Sq120(sq64)] == bP);
+    }
+    while(temp_pawns[BOTH]) {
+        sq64 = POP(&temp_pawns[BOTH]);
+        ASSERT((pos->pieces[Sq120(sq64)] == bP) || (pos->pieces[Sq120(sq64)] == wP));
+    }
+
+    // Validate material, piece counts, and other board state
+    ASSERT(temp_Material[WHITE] == pos->material[WHITE] && temp_Material[BLACK] == pos->material[BLACK]);
+    ASSERT(temp_MinPce[WHITE] == pos->minPce[WHITE] && temp_MinPce[BLACK] == pos->minPce[BLACK]);
+    ASSERT(temp_MajPce[WHITE] == pos->majPce[WHITE] && temp_MajPce[BLACK] == pos->majPce[BLACK]);
+    ASSERT(temp_BigPce[WHITE] == pos->bigPce[WHITE] && temp_BigPce[BLACK] == pos->bigPce[BLACK]);
+
+    ASSERT(pos->side == WHITE || pos->side == BLACK);
+    ASSERT(GenerateHashKey(pos) == pos->posKey);
+    ASSERT(pos->enPas == NO_SQ || (RanksBoard[pos->enPas] == RANK_6 && pos->side == WHITE) || (RanksBoard[pos->enPas] == RANK_3 && pos->side == BLACK));
+    ASSERT(pos->pieces[pos->KingSq[WHITE]] == wK);
+    ASSERT(pos->pieces[pos->KingSq[BLACK]] == bK);
+    ASSERT(pos->castlePerm >= 0 && pos->castlePerm <= 15);
+
+    return TRUE;
+}
+
 // Update material counts and piece lists for the given board position
 void UpdateMaterial(BOARD *pos) {
     int pce, sq, idx, color;
@@ -21,8 +99,17 @@ void UpdateMaterial(BOARD *pos) {
             pos->pceNum[pce]++;
 
             // Update king square positions
-            if(pce==wK) pos->KingSq[WHITE] = sq;
-            if(pce==bK) pos->KingSq[BLACK] = sq;
+            if(pce == wK) pos->KingSq[WHITE] = sq;
+            if(pce == bK) pos->KingSq[BLACK] = sq;
+
+            // Update pawn bitboards
+            if(pce == wP) {
+                SET_BIT(pos->pawns[WHITE], Sq64(sq));
+                SET_BIT(pos->pawns[BOTH], Sq64(sq));
+            } else if(pce == bP) {
+                SET_BIT(pos->pawns[BLACK], Sq64(sq));
+                SET_BIT(pos->pawns[BOTH], Sq64(sq));
+            }
         }
     }
 }
@@ -32,14 +119,8 @@ int ParseFen(char *fen, BOARD *pos) {
     ASSERT(fen);
     ASSERT(pos);
 
-    int sq = 0;
-    int piece = 0;
-    int count = 0;
-    int rank = RANK_8;  // Start from top rank
-    int file = FILE_A;  // Start from leftmost file
-
-    int sq64 = 0;  // 0-63 board index
-    int sq120 = 0; // 120-square board index
+    int sq = 0, piece = 0, count = 0, rank = RANK_8, file = FILE_A;
+    int sq64 = 0, sq120 = 0;
 
     ResetBoard(pos); // Reset board to initial empty state
 
@@ -60,29 +141,13 @@ int ParseFen(char *fen, BOARD *pos) {
             case 'B': piece = wB; break;
             case 'Q': piece = wQ; break;
             case 'K': piece = wK; break;
-
             // Handle empty squares
-            case '1': 
-            case '2': 
-            case '3': 
-            case '4': 
-            case '5': 
-            case '6': 
-            case '7': 
-            case '8': 
-                piece = EMPTY; 
-                count = *fen - '0'; 
-                break;
+            case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8':
+                piece = EMPTY; count = *fen - '0'; break;
             // Handle rank separators and spaces
-            case '/': 
-            case ' ':
-                rank--; 
-                file = FILE_A; 
-                fen++; 
-                continue;
-            default: 
-                printf("Parsing FEN error\n"); 
-                return -1;
+            case '/': case ' ':
+                rank--; file = FILE_A; fen++; continue;
+            default: printf("Parsing FEN error\n"); return -1;
         }
         // Place pieces on the board
         for (sq = 0; sq < count; sq++) {
@@ -101,9 +166,7 @@ int ParseFen(char *fen, BOARD *pos) {
     
     // Parse castling permissions
     for (sq = 0; sq < 4; sq++) {
-        if (*fen == ' ') {
-            break;
-        }
+        if (*fen == ' ') break;
         switch (*fen) {
             case 'K': pos->castlePerm |= WKCA; break;
             case 'Q': pos->castlePerm |= WQCA; break;
@@ -114,25 +177,23 @@ int ParseFen(char *fen, BOARD *pos) {
         fen++;
     }
     fen++;
-    ASSERT(pos->castlePerm>=0 && pos->castlePerm<=15);
+    ASSERT(pos->castlePerm >= 0 && pos->castlePerm <= 15);
+    
     // Parse en passant square
     if (*fen != '-') {
         file = fen[0] - 'a';
         rank = fen[1] - '1';
-
         ASSERT(file >= FILE_A && file <= FILE_H);
         ASSERT(rank >= RANK_1 && rank <= RANK_8);
-
         pos->enPas = FrToSq(file, rank);
     }
     pos->posKey = GenerateHashKey(pos); // Generate position hash key
-
+    UpdateMaterial(pos);
     return 0;
 }
 
 // Reset board to initial empty state
 void ResetBoard(BOARD *pos) {
-
     int sq = 0;
 
     // Mark all squares as off board initially
@@ -166,10 +227,8 @@ void ResetBoard(BOARD *pos) {
     pos->side = BOTH;
     pos->enPas = NO_SQ;
     pos->fiftyMove = 0;
-
     pos->ply = 0;
     pos->hisPly = 0;
-
     pos->castlePerm = 0;
     pos->posKey = 0ULL;
 }

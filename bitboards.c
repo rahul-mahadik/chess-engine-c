@@ -41,8 +41,9 @@ void PrintBitBoard(U64 bitBoard) {
             sq = FrToSq(file, rank);
             sq64 = Sq64(sq);
             if((shiftMe << sq64) & bitBoard) 
-            printf("X");
-            else printf("-");
+                printf("X");
+            else 
+                printf("-");
         }
         printf("\n");
     }

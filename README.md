@@ -5,6 +5,11 @@ A chess engine built from scratch in C
 
 ## Development Log
 
+### Dec 30 2024
+- Implemented move bit operations (32-bit move encoding/decoding)
+- Added algebraic notation parsing and printing
+- Created square attack detection functionality
+
 ### Dec 2024
 - Implemented Zobrist hashing for unique position keys
 - Added FEN (Forsyth–Edwards Notation) string parsing for board setup
